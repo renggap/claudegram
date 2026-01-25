@@ -4,282 +4,916 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claudegram - Claude Code via Telegram</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg-deep: #0a0a0f;
+      --bg-surface: #12121a;
+      --neon-cyan: #00ffd5;
+      --neon-magenta: #ff006e;
+      --neon-amber: #ffbe0b;
+      --text-primary: #e8e8ed;
+      --text-muted: #6b6b7b;
+      --glass-bg: rgba(18, 18, 26, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glow-cyan: 0 0 20px rgba(0, 255, 213, 0.4), 0 0 40px rgba(0, 255, 213, 0.2);
+      --glow-magenta: 0 0 20px rgba(255, 0, 110, 0.4), 0 0 40px rgba(255, 0, 110, 0.2);
+    }
+
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #e4e4e7;
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-deep);
+      color: var(--text-primary);
       min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Matrix Rain Canvas */
+    #matrix-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      opacity: 0.15;
+      pointer-events: none;
+    }
+
+    /* Gradient Orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 1;
+      animation: orbFloat 20s ease-in-out infinite;
+    }
+
+    .orb-1 {
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(0, 255, 213, 0.15) 0%, transparent 70%);
+      top: -200px;
+      right: -200px;
+      animation-delay: 0s;
+    }
+
+    .orb-2 {
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(255, 0, 110, 0.12) 0%, transparent 70%);
+      bottom: -150px;
+      left: -150px;
+      animation-delay: -10s;
+    }
+
+    .orb-3 {
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(255, 190, 11, 0.1) 0%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      animation-delay: -5s;
+    }
+
+    @keyframes orbFloat {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(30px, -30px) scale(1.05); }
+      50% { transform: translate(-20px, 20px) scale(0.95); }
+      75% { transform: translate(20px, 30px) scale(1.02); }
+    }
+
+    /* Main Content */
+    .content {
+      position: relative;
+      z-index: 10;
     }
 
     .container {
-      max-width: 900px;
+      max-width: 1100px;
       margin: 0 auto;
-      padding: 2rem;
+      padding: 0 2rem;
     }
 
-    header {
-      text-align: center;
-      padding: 4rem 0;
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1rem 2rem;
+      background: rgba(10, 10, 15, 0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--glass-border);
+      transform: translateY(-100%);
+      animation: slideDown 0.6s ease 0.5s forwards;
     }
 
-    .logo {
-      font-size: 4rem;
-      margin-bottom: 1rem;
+    @keyframes slideDown {
+      to { transform: translateY(0); }
     }
 
-    h1 {
-      font-size: 3rem;
+    .nav-content {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.25rem;
       font-weight: 700;
-      background: linear-gradient(135deg, #d4a574 0%, #e9c46a 100%);
+      color: var(--neon-cyan);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-logo span {
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { text-shadow: var(--glow-cyan); }
+      50% { text-shadow: 0 0 30px rgba(0, 255, 213, 0.8), 0 0 60px rgba(0, 255, 213, 0.4); }
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+    }
+
+    .nav-links a:hover {
+      color: var(--neon-cyan);
+    }
+
+    /* Hero Section */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 8rem 2rem 4rem;
+      position: relative;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--neon-cyan);
+      margin-bottom: 2rem;
+      opacity: 0;
+      animation: fadeInUp 0.8s ease 0.3s forwards;
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--neon-cyan);
+      border-radius: 50%;
+      animation: blink 1.5s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .hero-title {
+      font-size: clamp(3rem, 10vw, 6rem);
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeInUp 0.8s ease 0.5s forwards;
+    }
+
+    .hero-title .highlight {
+      background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-magenta) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      margin-bottom: 1rem;
     }
 
-    .tagline {
-      font-size: 1.25rem;
-      color: #a1a1aa;
-      margin-bottom: 2rem;
+    .hero-subtitle {
+      font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+      color: var(--text-muted);
+      max-width: 600px;
+      line-height: 1.6;
+      margin-bottom: 3rem;
+      opacity: 0;
+      animation: fadeInUp 0.8s ease 0.7s forwards;
     }
 
-    .cta-buttons {
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .hero-buttons {
       display: flex;
       gap: 1rem;
-      justify-content: center;
       flex-wrap: wrap;
+      justify-content: center;
+      opacity: 0;
+      animation: fadeInUp 0.8s ease 0.9s forwards;
     }
 
     .btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.875rem 1.5rem;
-      border-radius: 8px;
+      gap: 0.75rem;
+      padding: 1rem 2rem;
+      border-radius: 12px;
       text-decoration: none;
-      font-weight: 500;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .btn:hover {
-      transform: translateY(-2px);
+      font-weight: 600;
+      font-size: 1rem;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, #d4a574 0%, #c4956a 100%);
-      color: #1a1a2e;
+      background: linear-gradient(135deg, var(--neon-cyan) 0%, #00b894 100%);
+      color: var(--bg-deep);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 0 30px rgba(0, 255, 213, 0.6), 0 0 60px rgba(0, 255, 213, 0.3);
     }
 
     .btn-secondary {
-      background: rgba(255,255,255,0.1);
-      color: #e4e4e7;
-      border: 1px solid rgba(255,255,255,0.2);
+      background: var(--glass-bg);
+      color: var(--text-primary);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(10px);
     }
 
-    .features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin: 4rem 0;
+    .btn-secondary:hover {
+      border-color: var(--neon-cyan);
+      background: rgba(0, 255, 213, 0.1);
     }
 
-    .feature {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 12px;
+    /* Terminal Demo */
+    .terminal-section {
+      padding: 6rem 0;
+    }
+
+    .terminal {
+      background: var(--bg-surface);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transform: translateY(50px);
+      transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .terminal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 1.25rem;
+      background: rgba(0, 0, 0, 0.3);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .terminal-dot.red { background: #ff5f57; }
+    .terminal-dot.yellow { background: #febc2e; }
+    .terminal-dot.green { background: #28c840; }
+
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .terminal-body {
       padding: 1.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      line-height: 1.8;
+      min-height: 300px;
+    }
+
+    .terminal-line {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+
+    .terminal-line.visible {
+      animation: typeLine 0.4s ease forwards;
+    }
+
+    @keyframes typeLine {
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .terminal-prompt {
+      color: var(--neon-cyan);
+    }
+
+    .terminal-command {
+      color: var(--text-primary);
+    }
+
+    .terminal-output {
+      color: var(--text-muted);
+      padding-left: 1rem;
+      border-left: 2px solid var(--glass-border);
+      margin: 0.5rem 0;
+    }
+
+    .terminal-success {
+      color: #28c840;
+    }
+
+    .terminal-cursor {
+      display: inline-block;
+      width: 10px;
+      height: 1.2em;
+      background: var(--neon-cyan);
+      animation: cursorBlink 1s step-end infinite;
+      vertical-align: text-bottom;
+    }
+
+    @keyframes cursorBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Features Section */
+    .features-section {
+      padding: 6rem 0;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .section-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem;
+      color: var(--neon-magenta);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 1rem;
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 2rem;
+      backdrop-filter: blur(10px);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 0;
+      transform: translateY(30px);
+    }
+
+    .feature-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(0, 255, 213, 0.3);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     }
 
     .feature-icon {
-      font-size: 2rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .feature h3 {
-      font-size: 1.125rem;
-      margin-bottom: 0.5rem;
-      color: #f4f4f5;
-    }
-
-    .feature p {
-      color: #a1a1aa;
-      font-size: 0.9375rem;
-      line-height: 1.6;
-    }
-
-    .architecture {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 12px;
-      padding: 2rem;
-      margin: 3rem 0;
-    }
-
-    .architecture h2 {
-      text-align: center;
-      margin-bottom: 1.5rem;
-      color: #f4f4f5;
-    }
-
-    .flow {
+      width: 56px;
+      height: 56px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      font-family: monospace;
-      font-size: 0.9rem;
+      background: linear-gradient(135deg, rgba(0, 255, 213, 0.1) 0%, rgba(255, 0, 110, 0.1) 100%);
+      border-radius: 12px;
+      font-size: 1.5rem;
+      margin-bottom: 1.25rem;
     }
 
-    .flow-item {
-      background: rgba(212, 165, 116, 0.2);
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      border: 1px solid rgba(212, 165, 116, 0.3);
+    .feature-card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    /* Architecture Section */
+    .architecture-section {
+      padding: 6rem 0;
+    }
+
+    .architecture-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      padding: 3rem;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+    }
+
+    .flow-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1.5rem 2rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      transition: all 0.3s;
+    }
+
+    .flow-node:hover {
+      border-color: var(--neon-cyan);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .flow-node-icon {
+      font-size: 2rem;
+    }
+
+    .flow-node-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--text-primary);
     }
 
     .flow-arrow {
-      color: #d4a574;
+      color: var(--neon-cyan);
+      font-size: 1.5rem;
+      animation: arrowPulse 1.5s ease-in-out infinite;
     }
 
-    .commands {
-      margin: 3rem 0;
+    @keyframes arrowPulse {
+      0%, 100% { opacity: 0.5; transform: translateX(0); }
+      50% { opacity: 1; transform: translateX(5px); }
     }
 
-    .commands h2 {
-      text-align: center;
-      margin-bottom: 1.5rem;
-      color: #f4f4f5;
+    /* Commands Section */
+    .commands-section {
+      padding: 6rem 0;
     }
 
-    .command-list {
-      background: rgba(0,0,0,0.3);
-      border-radius: 8px;
-      padding: 1.5rem;
-      font-family: monospace;
-    }
-
-    .command {
-      display: flex;
+    .commands-grid {
+      display: grid;
       gap: 1rem;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
     }
 
-    .command:last-child {
-      border-bottom: none;
+    .command-row {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 2rem;
+      padding: 1.25rem 1.5rem;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      align-items: center;
+      transition: all 0.3s;
+      opacity: 0;
+      transform: translateX(-20px);
     }
 
-    .command code {
-      color: #d4a574;
-      min-width: 180px;
+    .command-row.visible {
+      opacity: 1;
+      transform: translateX(0);
     }
 
-    .command span {
-      color: #a1a1aa;
+    .command-row:hover {
+      border-color: var(--neon-amber);
+      background: rgba(255, 190, 11, 0.05);
     }
 
+    .command-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      color: var(--neon-amber);
+    }
+
+    .command-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* Footer */
     footer {
+      padding: 4rem 2rem;
       text-align: center;
-      padding: 3rem 0;
-      color: #71717a;
-      font-size: 0.875rem;
+      border-top: 1px solid var(--glass-border);
     }
 
-    footer a {
-      color: #d4a574;
+    .footer-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--neon-cyan);
+      margin-bottom: 1rem;
+    }
+
+    .footer-text {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
       text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+    }
+
+    .footer-links a:hover {
+      color: var(--neon-cyan);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .hero { padding: 6rem 1.5rem 3rem; }
+      .architecture-flow { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+      .command-row { grid-template-columns: 1fr; gap: 0.5rem; }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-deep);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--glass-border);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--neon-cyan);
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="logo">🤖</div>
-      <h1>Claudegram</h1>
-      <p class="tagline">Control Claude Code from your phone via Telegram</p>
-      <div class="cta-buttons">
+  <canvas id="matrix-canvas"></canvas>
+
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="content">
+    <nav>
+      <div class="nav-content">
+        <a href="#" class="nav-logo">
+          <span>⚡</span> Claudegram
+        </a>
+        <div class="nav-links">
+          <a href="#features">Features</a>
+          <a href="#demo">Demo</a>
+          <a href="#commands">Commands</a>
+          <a href="https://github.com/NachoSEO/claudegram">GitHub</a>
+        </div>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div class="hero-badge">
+        <span class="badge-dot"></span>
+        Open Source
+      </div>
+      <h1 class="hero-title">
+        <span class="highlight">Claude Code</span><br>
+        via Telegram
+      </h1>
+      <p class="hero-subtitle">
+        Control your local development environment from anywhere.
+        Full agent capabilities — file operations, commands, code generation —
+        all from your phone.
+      </p>
+      <div class="hero-buttons">
         <a href="https://github.com/NachoSEO/claudegram" class="btn btn-primary">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           View on GitHub
         </a>
-        <a href="https://github.com/NachoSEO/claudegram#get-started" class="btn btn-secondary">
-          Get Started
+        <a href="https://github.com/NachoSEO/claudegram#setup" class="btn btn-secondary">
+          Quick Start →
         </a>
       </div>
-    </header>
+    </section>
 
-    <div class="features">
-      <div class="feature">
-        <div class="feature-icon">📱</div>
-        <h3>Mobile First</h3>
-        <p>Send messages from anywhere using Telegram. Perfect for quick code checks or fixes on the go.</p>
+    <section id="demo" class="terminal-section">
+      <div class="container">
+        <div class="terminal" id="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <span class="terminal-title">Telegram Chat</span>
+          </div>
+          <div class="terminal-body">
+            <div class="terminal-line" data-delay="0">
+              <span class="terminal-prompt">You →</span> <span class="terminal-command">/project my-app</span>
+            </div>
+            <div class="terminal-line" data-delay="400">
+              <span class="terminal-output terminal-success">✓ Project: my-app</span>
+            </div>
+            <div class="terminal-line" data-delay="800">
+              <span class="terminal-prompt">You →</span> <span class="terminal-command">Add a dark mode toggle to the header</span>
+            </div>
+            <div class="terminal-line" data-delay="1200">
+              <span class="terminal-output">Reading src/components/Header.tsx...</span>
+            </div>
+            <div class="terminal-line" data-delay="1600">
+              <span class="terminal-output">Adding dark mode state and toggle button...</span>
+            </div>
+            <div class="terminal-line" data-delay="2000">
+              <span class="terminal-output terminal-success">✓ Modified Header.tsx — added dark mode toggle</span>
+            </div>
+            <div class="terminal-line" data-delay="2400">
+              <span class="terminal-output terminal-success">✓ Created useTheme.ts hook</span>
+            </div>
+            <div class="terminal-line" data-delay="2800">
+              <span class="terminal-prompt">You →</span> <span class="terminal-cursor"></span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="feature">
-        <div class="feature-icon">⚡</div>
-        <h3>Full Agent Power</h3>
-        <p>Access Claude's full capabilities: read files, write code, run commands, and more.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🔒</div>
-        <h3>Secure</h3>
-        <p>Runs on your local machine. Only authorized Telegram users can interact with your bot.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🔄</div>
-        <h3>Streaming</h3>
-        <p>Watch Claude's responses appear in real-time with progressive message updates.</p>
-      </div>
-    </div>
+    </section>
 
-    <div class="architecture">
-      <h2>How it Works</h2>
-      <div class="flow">
-        <span class="flow-item">Telegram App</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-item">Claudegram Bot</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-item">Claude Code SDK</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-item">Your Machine</span>
+    <section id="features" class="features-section">
+      <div class="container">
+        <div class="section-header">
+          <p class="section-tag">Capabilities</p>
+          <h2 class="section-title">Full Agent Power in Your Pocket</h2>
+        </div>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">📱</div>
+            <h3>Mobile-First</h3>
+            <p>Send coding requests from anywhere using Telegram. Perfect for quick fixes, code reviews, or managing projects on the go.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>Real-Time Streaming</h3>
+            <p>Watch Claude's responses appear character by character. No waiting — see progress as it happens with debounced updates.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔧</div>
+            <h3>Full Tool Access</h3>
+            <p>Read files, write code, run bash commands, search codebases. Every Claude Code capability available through chat.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔒</div>
+            <h3>Secure by Default</h3>
+            <p>Runs on your local machine. Whitelist specific Telegram users. Your code never leaves your network.</p>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div class="commands">
-      <h2>Commands</h2>
-      <div class="command-list">
-        <div class="command">
-          <code>/project &lt;name&gt;</code>
-          <span>Open a project from your workspace</span>
+    <section class="architecture-section">
+      <div class="container">
+        <div class="section-header">
+          <p class="section-tag">Architecture</p>
+          <h2 class="section-title">How It Works</h2>
         </div>
-        <div class="command">
-          <code>/newproject &lt;name&gt;</code>
-          <span>Create and open a new project</span>
-        </div>
-        <div class="command">
-          <code>/new</code>
-          <span>Clear session and start fresh</span>
-        </div>
-        <div class="command">
-          <code>/status</code>
-          <span>Show current session info</span>
+        <div class="architecture-flow">
+          <div class="flow-node">
+            <span class="flow-node-icon">📱</span>
+            <span class="flow-node-label">Telegram</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-node">
+            <span class="flow-node-icon">🤖</span>
+            <span class="flow-node-label">Claudegram</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-node">
+            <span class="flow-node-icon">🧠</span>
+            <span class="flow-node-label">Claude SDK</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-node">
+            <span class="flow-node-icon">💻</span>
+            <span class="flow-node-label">Your Machine</span>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
+
+    <section id="commands" class="commands-section">
+      <div class="container">
+        <div class="section-header">
+          <p class="section-tag">Reference</p>
+          <h2 class="section-title">Commands</h2>
+        </div>
+        <div class="commands-grid">
+          <div class="command-row">
+            <code class="command-code">/project &lt;name&gt;</code>
+            <span class="command-desc">Open a project from your workspace directory</span>
+          </div>
+          <div class="command-row">
+            <code class="command-code">/newproject &lt;name&gt;</code>
+            <span class="command-desc">Create and open a new project</span>
+          </div>
+          <div class="command-row">
+            <code class="command-code">/new</code>
+            <span class="command-desc">Clear the current session and start fresh</span>
+          </div>
+          <div class="command-row">
+            <code class="command-code">/status</code>
+            <span class="command-desc">Show current session and project info</span>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <footer>
-      <p>Built with Claude Code SDK and grammY</p>
-      <p style="margin-top: 0.5rem;">
+      <div class="footer-logo">⚡ Claudegram</div>
+      <p class="footer-text">Built with Claude Code SDK and grammY</p>
+      <div class="footer-links">
         <a href="https://github.com/NachoSEO/claudegram">GitHub</a>
-      </p>
+        <a href="https://github.com/NachoSEO/claudegram#setup">Documentation</a>
+        <a href="https://github.com/NachoSEO/claudegram/issues">Issues</a>
+      </div>
     </footer>
   </div>
+
+  <script>
+    // Matrix Rain Effect
+    const canvas = document.getElementById('matrix-canvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const charArray = chars.split('');
+    const fontSize = 14;
+    const columns = canvas.width / fontSize;
+    const drops = Array(Math.floor(columns)).fill(1);
+
+    function drawMatrix() {
+      ctx.fillStyle = 'rgba(10, 10, 15, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#00ffd5';
+      ctx.font = fontSize + 'px JetBrains Mono, monospace';
+
+      for (let i = 0; i < drops.length; i++) {
+        const char = charArray[Math.floor(Math.random() * charArray.length)];
+        ctx.fillText(char, i * fontSize, drops[i] * fontSize);
+
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+    }
+
+    setInterval(drawMatrix, 50);
+
+    // Intersection Observer for scroll animations
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, observerOptions);
+
+    // Observe elements
+    document.querySelectorAll('.terminal, .feature-card, .command-row').forEach(el => {
+      observer.observe(el);
+    });
+
+    // Terminal typing animation
+    const terminalObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const lines = entry.target.querySelectorAll('.terminal-line');
+          lines.forEach((line, index) => {
+            const delay = parseInt(line.dataset.delay) || index * 300;
+            setTimeout(() => {
+              line.classList.add('visible');
+            }, delay);
+          });
+          terminalObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.3 });
+
+    terminalObserver.observe(document.getElementById('terminal'));
+
+    // Stagger feature cards
+    document.querySelectorAll('.feature-card').forEach((card, index) => {
+      card.style.transitionDelay = `${index * 0.1}s`;
+    });
+
+    // Stagger command rows
+    document.querySelectorAll('.command-row').forEach((row, index) => {
+      row.style.transitionDelay = `${index * 0.1}s`;
+    });
+  </script>
 </body>
 </html>
