@@ -118,11 +118,6 @@ export async function sendToAgent(
     });
   }
 
-  // Keep only last 20 messages to avoid context issues
-  if (history.length > 20) {
-    history = history.slice(-20);
-  }
-
   conversationHistory.set(chatId, history);
 
   return {

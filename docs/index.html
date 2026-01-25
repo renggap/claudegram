@@ -840,37 +840,7 @@
               </div>
             </div>
             <div class="telegram-chat" id="chat-messages">
-              <div class="chat-message outgoing" data-delay="0">
-                <code>/project my-app</code>
-                <span class="time">10:24 <span class="check">✓✓</span></span>
-              </div>
-              <div class="chat-message incoming" data-delay="400">
-                <span class="success">✓</span> Project: <strong>my-app</strong>
-                <br><span style="color: rgba(255,255,255,0.6);">You can now chat with Claude about this project!</span>
-                <span class="time">10:24</span>
-              </div>
-              <div class="chat-message outgoing" data-delay="800">
-                Add a dark mode toggle to the header
-                <span class="time">10:25 <span class="check">✓✓</span></span>
-              </div>
-              <div class="chat-message incoming" data-delay="1400">
-                Reading <code>src/components/Header.tsx</code>...
-                <span class="time">10:25</span>
-              </div>
-              <div class="chat-message incoming" data-delay="2000">
-                <span class="success">✓</span> Modified <code>Header.tsx</code><br>
-                <span class="file-info">📄 Added dark mode state and toggle button</span>
-                <span class="time">10:25</span>
-              </div>
-              <div class="chat-message incoming" data-delay="2600">
-                <span class="success">✓</span> Created <code>useTheme.ts</code><br>
-                <span class="file-info">📄 New hook for theme management</span>
-                <span class="time">10:25</span>
-              </div>
-              <div class="chat-message incoming" data-delay="3200">
-                Done! The header now has a dark mode toggle. Click the 🌙 icon to switch themes.
-                <span class="time">10:25</span>
-              </div>
+              <!-- Messages will be added dynamically -->
             </div>
             <div class="telegram-input">
               <span class="telegram-input-icon">📎</span>
@@ -1040,17 +1010,121 @@
       observer.observe(el);
     });
 
-    // Telegram chat animation
+    // Telegram chat conversation simulation with typing effect
+    const chatContainer = document.getElementById('chat-messages');
+    const conversation = [
+      { type: 'outgoing', text: '/project my-app', isCode: true },
+      { type: 'incoming', text: '✓ Project: my-app', subtext: 'You can now chat with Claude about this project!' },
+      { type: 'outgoing', text: 'Add a dark mode toggle to the header' },
+      { type: 'typing', duration: 800 },
+      { type: 'incoming', text: 'Reading src/components/Header.tsx...' },
+      { type: 'typing', duration: 1200 },
+      { type: 'incoming', text: '✓ Modified Header.tsx', subtext: '📄 Added dark mode state and toggle button' },
+      { type: 'incoming', text: '✓ Created useTheme.ts', subtext: '📄 New hook for theme management' },
+      { type: 'typing', duration: 600 },
+      { type: 'incoming', text: 'Done! The header now has a dark mode toggle. Click the 🌙 icon to switch themes.' },
+    ];
+
+    let chatStarted = false;
+
+    function createTypingIndicator() {
+      const div = document.createElement('div');
+      div.className = 'typing-indicator';
+      for (let i = 0; i < 3; i++) {
+        div.appendChild(document.createElement('span'));
+      }
+      return div;
+    }
+
+    function createMessageElement(msg) {
+      const div = document.createElement('div');
+      div.className = 'chat-message ' + msg.type;
+
+      const textSpan = document.createElement('span');
+      textSpan.className = 'msg-text';
+
+      if (msg.isCode) {
+        const code = document.createElement('code');
+        textSpan.appendChild(code);
+      } else if (msg.text.startsWith('✓')) {
+        const success = document.createElement('span');
+        success.className = 'success';
+        textSpan.appendChild(success);
+      }
+
+      div.appendChild(textSpan);
+
+      if (msg.subtext) {
+        div.appendChild(document.createElement('br'));
+        const sub = document.createElement('span');
+        sub.className = 'msg-subtext';
+        sub.style.cssText = 'color: rgba(255,255,255,0.6); font-size: 0.85rem;';
+        sub.textContent = msg.subtext;
+        div.appendChild(sub);
+      }
+
+      const time = document.createElement('span');
+      time.className = 'time';
+      time.textContent = '10:24';
+      if (msg.type === 'outgoing') {
+        const check = document.createElement('span');
+        check.className = 'check';
+        check.textContent = ' ✓✓';
+        time.appendChild(check);
+      }
+      div.appendChild(time);
+
+      return div;
+    }
+
+    async function typeText(element, text, speed) {
+      const textSpan = element.querySelector('.msg-text');
+      const targetEl = textSpan.querySelector('code, .success') || textSpan;
+
+      element.style.opacity = '1';
+      element.style.transform = 'translateY(0)';
+
+      for (let i = 0; i <= text.length; i++) {
+        targetEl.textContent = text.substring(0, i);
+        await new Promise(r => setTimeout(r, speed));
+      }
+    }
+
+    async function runConversation() {
+      if (chatStarted) return;
+      chatStarted = true;
+
+      for (const msg of conversation) {
+        if (msg.type === 'typing') {
+          const typing = createTypingIndicator();
+          chatContainer.appendChild(typing);
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+          await new Promise(r => setTimeout(r, msg.duration));
+          typing.remove();
+        } else {
+          const msgEl = createMessageElement(msg);
+          chatContainer.appendChild(msgEl);
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+
+          if (msg.type === 'incoming') {
+            await typeText(msgEl, msg.text, 25);
+          } else {
+            const textSpan = msgEl.querySelector('.msg-text');
+            const targetEl = textSpan.querySelector('code') || textSpan;
+            targetEl.textContent = msg.text;
+            msgEl.style.opacity = '1';
+            msgEl.style.transform = 'translateY(0)';
+          }
+
+          await new Promise(r => setTimeout(r, msg.type === 'outgoing' ? 600 : 300));
+        }
+      }
+    }
+
     const chatObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          const messages = entry.target.querySelectorAll('.chat-message');
-          messages.forEach((msg) => {
-            const delay = parseInt(msg.dataset.delay) || 0;
-            setTimeout(() => {
-              msg.classList.add('visible');
-            }, delay);
-          });
+          runConversation();
           chatObserver.unobserve(entry.target);
         }
       });
