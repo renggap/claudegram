@@ -376,10 +376,20 @@
     .telegram-chat {
       background: #0e1621;
       padding: 1rem;
-      min-height: 400px;
+      height: 420px;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
+    }
+
+    .telegram-chat::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .telegram-chat::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
     }
 
     .chat-message {
