@@ -21,8 +21,11 @@ import {
 } from '../../claude/request-queue.js';
 import { createTelegraphFromFile } from '../../telegram/telegraph.js';
 import { escapeMarkdownV2 } from '../../telegram/markdown.js';
+import { getTTSSettings, setTTSEnabled, setTTSVoice } from '../../tts/tts-settings.js';
+import { maybeSendVoiceReply } from '../../tts/voice-reply.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execFile } from 'child_process';
 
 // Helper for consistent MarkdownV2 replies
 async function replyMd(ctx: Context, text: string): Promise<void> {
@@ -32,6 +35,60 @@ async function replyMd(ctx: Context, text: string): Promise<void> {
 // Escape dynamic text for MarkdownV2
 function esc(text: string): string {
   return escapeMarkdownV2(text);
+}
+
+const TTS_VOICES = [
+  'alloy', 'ash', 'ballad', 'coral',
+  'echo', 'fable', 'nova', 'onyx',
+  'sage', 'shimmer', 'verse', 'marin', 'cedar',
+] as const;
+
+type TTSMenuMode = 'main' | 'voices';
+
+function buildTTSMenu(chatId: number, mode: TTSMenuMode) {
+  const settings = getTTSSettings(chatId);
+  const apiStatus = config.OPENAI_API_KEY ? 'configured' : 'missing';
+
+  const statusLine = settings.enabled ? 'ON' : 'OFF';
+  const header = `🔊 *Voice Replies*`;
+  const baseText =
+    `${header}\n\n` +
+    `Status: *${statusLine}*\n` +
+    `Voice: *${esc(settings.voice)}*\n` +
+    `API key: *${esc(apiStatus)}*`;
+
+  if (mode === 'voices') {
+    const voiceRows: { text: string; callback_data: string }[][] = [];
+    const chunkSize = 4;
+    for (let i = 0; i < TTS_VOICES.length; i += chunkSize) {
+      const chunk = TTS_VOICES.slice(i, i + chunkSize);
+      voiceRows.push(chunk.map((voice) => ({
+        text: voice === settings.voice ? `✓ ${voice}` : voice,
+        callback_data: `tts:voice:${voice}`,
+      })));
+    }
+
+    return {
+      text:
+        `${header}\n\n` +
+        `Pick a voice\\.\nRecommended: marin, cedar\\.`,
+      keyboard: [
+        ...voiceRows,
+        [{ text: 'Back', callback_data: 'tts:back' }],
+      ],
+    };
+  }
+
+  return {
+    text: baseText,
+    keyboard: [
+      [
+        { text: settings.enabled ? '✓ On' : 'On', callback_data: 'tts:on' },
+        { text: !settings.enabled ? '✓ Off' : 'Off', callback_data: 'tts:off' },
+      ],
+      [{ text: `Voice: ${settings.voice}`, callback_data: 'tts:voices' }],
+    ],
+  };
 }
 
 export async function handleStart(ctx: Context): Promise<void> {
@@ -363,6 +420,48 @@ export async function handleModeCallback(ctx: Context): Promise<void> {
   );
 }
 
+export async function handleTTS(ctx: Context): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  const menu = buildTTSMenu(chatId, 'main');
+
+  await ctx.reply(menu.text, {
+    parse_mode: 'MarkdownV2',
+    reply_markup: { inline_keyboard: menu.keyboard },
+  });
+}
+
+export async function handleTTSCallback(ctx: Context): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  const data = ctx.callbackQuery?.data;
+  if (!data || !data.startsWith('tts:')) return;
+
+  if (data === 'tts:on') {
+    setTTSEnabled(chatId, true);
+  } else if (data === 'tts:off') {
+    setTTSEnabled(chatId, false);
+  } else if (data.startsWith('tts:voice:')) {
+    const voice = data.replace('tts:voice:', '');
+    if (TTS_VOICES.includes(voice as typeof TTS_VOICES[number])) {
+      setTTSVoice(chatId, voice);
+    }
+  }
+
+  const mode: TTSMenuMode = data === 'tts:voices' || data.startsWith('tts:voice:')
+    ? 'voices'
+    : 'main';
+  const menu = buildTTSMenu(chatId, mode);
+
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageText(menu.text, {
+    parse_mode: 'MarkdownV2',
+    reply_markup: { inline_keyboard: menu.keyboard },
+  });
+}
+
 export async function handlePing(ctx: Context): Promise<void> {
   const uptime = getUptimeFormatted();
   await replyMd(ctx, `🏓 Pong\\!\n\nUptime: ${esc(uptime)}`);
@@ -500,6 +599,7 @@ export async function handlePlan(ctx: Context): Promise<void> {
         });
 
         await messageSender.finishStreaming(ctx, response.text);
+        await maybeSendVoiceReply(ctx, response.text);
       } catch (error) {
         await messageSender.cancelStreaming(ctx);
         throw error;
@@ -557,6 +657,7 @@ export async function handleExplore(ctx: Context): Promise<void> {
         });
 
         await messageSender.finishStreaming(ctx, response.text);
+        await maybeSendVoiceReply(ctx, response.text);
       } catch (error) {
         await messageSender.cancelStreaming(ctx);
         throw error;
@@ -688,6 +789,7 @@ export async function handleLoop(ctx: Context): Promise<void> {
         });
 
         await messageSender.finishStreaming(ctx, response.text);
+        await maybeSendVoiceReply(ctx, response.text);
       } catch (error) {
         await messageSender.cancelStreaming(ctx);
         throw error;
@@ -860,4 +962,138 @@ export async function handleTelegraph(ctx: Context): Promise<void> {
   } else {
     await replyMd(ctx, '❌ Failed to create Telegraph page\\.');
   }
+}
+
+/**
+ * Tokenize a user-provided argument string, preserving quoted substrings.
+ * Returns an array of individual arguments safe for execFile.
+ */
+function tokenizeArgs(input: string): string[] {
+  const tokens: string[] = [];
+  const re = /"([^"]*)"| '([^']*)'|(\S+)/g;
+  let match;
+  while ((match = re.exec(input)) !== null) {
+    tokens.push(match[1] ?? match[2] ?? match[3]);
+  }
+  return tokens;
+}
+
+/**
+ * Execute redditfetch.py and send the result to the user.
+ * Exported so message.handler.ts can reuse it for ForceReply flow.
+ */
+export async function executeRedditFetch(
+  ctx: Context,
+  args: string
+): Promise<void> {
+  await ctx.replyWithChatAction('typing');
+
+  const tokens = tokenizeArgs(args);
+
+  // Strip -o / --output flags (tool must write to stdout)
+  const cleanTokens: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i] === '-o' || tokens[i] === '--output') {
+      i++; // skip the flag and its value
+      continue;
+    }
+    cleanTokens.push(tokens[i]);
+  }
+
+  // Inject default --limit if not provided
+  if (!cleanTokens.includes('--limit') && !cleanTokens.includes('-l')) {
+    cleanTokens.push('--limit', String(config.REDDITFETCH_DEFAULT_LIMIT));
+  }
+
+  // Inject default --depth if not provided
+  if (!cleanTokens.includes('--depth')) {
+    cleanTokens.push('--depth', String(config.REDDITFETCH_DEFAULT_DEPTH));
+  }
+
+  const scriptPath = config.REDDITFETCH_PATH;
+  const scriptDir = path.dirname(scriptPath);
+
+  return new Promise<void>((resolve) => {
+    execFile(
+      'python3',
+      [scriptPath, ...cleanTokens],
+      {
+        timeout: config.REDDITFETCH_TIMEOUT_MS,
+        maxBuffer: 10 * 1024 * 1024, // 10 MB
+        cwd: scriptDir,
+      },
+      async (error, stdout, stderr) => {
+        try {
+          if (error) {
+            const stderrText = (stderr || '').trim();
+            let userMessage: string;
+
+            if (stderrText.includes('Missing credentials') || stderrText.includes('REDDIT_CLIENT_ID')) {
+              userMessage = '❌ Reddit credentials not configured\\.\n\nSet `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `REDDIT_PASSWORD` in the redditfetch \\.env file\\.';
+            } else if (stderrText.includes('ModuleNotFoundError')) {
+              const modMatch = stderrText.match(/No module named '(\w+)'/);
+              const modName = modMatch ? modMatch[1] : 'unknown';
+              userMessage = `❌ Missing Python dependency: \`${esc(modName)}\`\n\nRun: \`pip install ${esc(modName)}\``;
+            } else if ((error as { killed?: boolean }).killed) {
+              userMessage = '❌ Reddit fetch timed out\\.';
+            } else {
+              const detail = stderrText || error.message;
+              userMessage = `❌ Reddit fetch failed: ${esc(detail.substring(0, 300))}`;
+            }
+
+            await replyMd(ctx, userMessage);
+            resolve();
+            return;
+          }
+
+          const output = (stdout || '').trim();
+          if (!output) {
+            const hint = (stderr || '').trim();
+            const errorInfo = hint ? `\n\n_${esc(hint.substring(0, 200))}_` : '';
+            await replyMd(ctx, `❌ No results returned\\.${errorInfo}`);
+            resolve();
+            return;
+          }
+
+          await messageSender.sendMessage(ctx, output);
+          resolve();
+        } catch (sendError) {
+          console.error('[Reddit] Error sending result:', sendError);
+          try {
+            await replyMd(ctx, '❌ Failed to send Reddit results\\.');
+          } catch { /* swallow */ }
+          resolve();
+        }
+      }
+    );
+  });
+}
+
+export async function handleReddit(ctx: Context): Promise<void> {
+  const text = ctx.message?.text || '';
+  const args = text.split(' ').slice(1).join(' ').trim();
+
+  if (!args) {
+    await ctx.reply(
+      `📡 *Reddit Fetch*\n\n` +
+      `Fetch posts, subreddits, or user profiles from Reddit\\.\n\n` +
+      `*Examples:*\n` +
+      `• \`r/ClaudeAI \\-\\-sort new \\-\\-limit 5\`\n` +
+      `• \`1lmkfhf\` \\(post ID\\)\n` +
+      `• \`u/username \\-\\-limit 5\`\n` +
+      `• \`r/LocalLLaMA \\-\\-sort top \\-\\-time week\`\n\n` +
+      `👇 _Enter your Reddit target:_`,
+      {
+        parse_mode: 'MarkdownV2',
+        reply_markup: {
+          force_reply: true,
+          input_field_placeholder: 'r/ClaudeAI --sort new --limit 10',
+          selective: true,
+        },
+      }
+    );
+    return;
+  }
+
+  await executeRedditFetch(ctx, args);
 }
