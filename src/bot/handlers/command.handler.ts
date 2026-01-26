@@ -978,6 +978,85 @@ function tokenizeArgs(input: string): string[] {
   return tokens;
 }
 
+type RedditFormat = 'markdown' | 'json';
+
+function parseRedditArgs(tokens: string[]): {
+  cleanTokens: string[];
+  format: RedditFormat | null;
+  hadOutputFlag: boolean;
+} {
+  const cleanTokens: string[] = [];
+  let format: RedditFormat | null = null;
+  let hadOutputFlag = false;
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token === '-o' || token === '--output') {
+      hadOutputFlag = true;
+      i++; // skip value
+      continue;
+    }
+
+    if ((token === '-f' || token === '--format') && tokens[i + 1]) {
+      const next = tokens[i + 1] as RedditFormat;
+      if (next === 'json' || next === 'markdown') {
+        format = next;
+      }
+      cleanTokens.push(token, tokens[i + 1]);
+      i++;
+      continue;
+    }
+
+    cleanTokens.push(token);
+  }
+
+  return { cleanTokens, format, hadOutputFlag };
+}
+
+function ensureRedditOutputDir(ctx: Context): string {
+  const chatId = ctx.chat?.id;
+  const session = chatId ? sessionManager.getSession(chatId) : null;
+  const baseDir = session ? session.workingDirectory : process.cwd();
+  const dir = path.join(baseDir, '.claudegram', 'reddit');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function buildRedditOutputPath(ctx: Context, tokens: string[]): string {
+  const dir = ensureRedditOutputDir(ctx);
+  const raw = tokens[0] || 'reddit';
+  const slug = raw.replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40) || 'reddit';
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return path.join(dir, `reddit_${slug}_${stamp}.json`);
+}
+
+async function runRedditFetch(
+  ctx: Context,
+  scriptPath: string,
+  tokens: string[]
+): Promise<{ stdout: string; stderr: string }> {
+  const scriptDir = path.dirname(scriptPath);
+
+  return new Promise((resolve, reject) => {
+    execFile(
+      'python3',
+      [scriptPath, ...tokens],
+      {
+        timeout: config.REDDITFETCH_TIMEOUT_MS,
+        maxBuffer: 10 * 1024 * 1024, // 10 MB
+        cwd: scriptDir,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject({ error, stdout: stdout || '', stderr: stderr || '' });
+          return;
+        }
+        resolve({ stdout: stdout || '', stderr: stderr || '' });
+      }
+    );
+  });
+}
+
 /**
  * Execute redditfetch.py and send the result to the user.
  * Exported so message.handler.ts can reuse it for ForceReply flow.
@@ -989,16 +1068,7 @@ export async function executeRedditFetch(
   await ctx.replyWithChatAction('typing');
 
   const tokens = tokenizeArgs(args);
-
-  // Strip -o / --output flags (tool must write to stdout)
-  const cleanTokens: string[] = [];
-  for (let i = 0; i < tokens.length; i++) {
-    if (tokens[i] === '-o' || tokens[i] === '--output') {
-      i++; // skip the flag and its value
-      continue;
-    }
-    cleanTokens.push(tokens[i]);
-  }
+  const { cleanTokens, format, hadOutputFlag } = parseRedditArgs(tokens);
 
   // Inject default --limit if not provided
   if (!cleanTokens.includes('--limit') && !cleanTokens.includes('-l')) {
@@ -1011,62 +1081,68 @@ export async function executeRedditFetch(
   }
 
   const scriptPath = config.REDDITFETCH_PATH;
-  const scriptDir = path.dirname(scriptPath);
+  try {
+    const { stdout, stderr } = await runRedditFetch(ctx, scriptPath, cleanTokens);
+    const output = stdout.trim();
 
-  return new Promise<void>((resolve) => {
-    execFile(
-      'python3',
-      [scriptPath, ...cleanTokens],
-      {
-        timeout: config.REDDITFETCH_TIMEOUT_MS,
-        maxBuffer: 10 * 1024 * 1024, // 10 MB
-        cwd: scriptDir,
-      },
-      async (error, stdout, stderr) => {
-        try {
-          if (error) {
-            const stderrText = (stderr || '').trim();
-            let userMessage: string;
+    if (!output) {
+      const hint = (stderr || '').trim();
+      const errorInfo = hint ? `\n\n_${esc(hint.substring(0, 200))}_` : '';
+      await replyMd(ctx, `❌ No results returned\\.${errorInfo}`);
+      return;
+    }
 
-            if (stderrText.includes('Missing credentials') || stderrText.includes('REDDIT_CLIENT_ID')) {
-              userMessage = '❌ Reddit credentials not configured\\.\n\nSet `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `REDDIT_PASSWORD` in the redditfetch \\.env file\\.';
-            } else if (stderrText.includes('ModuleNotFoundError')) {
-              const modMatch = stderrText.match(/No module named '(\w+)'/);
-              const modName = modMatch ? modMatch[1] : 'unknown';
-              userMessage = `❌ Missing Python dependency: \`${esc(modName)}\`\n\nRun: \`pip install ${esc(modName)}\``;
-            } else if ((error as { killed?: boolean }).killed) {
-              userMessage = '❌ Reddit fetch timed out\\.';
-            } else {
-              const detail = stderrText || error.message;
-              userMessage = `❌ Reddit fetch failed: ${esc(detail.substring(0, 300))}`;
-            }
+    if (!format && output.length > config.REDDITFETCH_JSON_THRESHOLD_CHARS) {
+      const outputPath = buildRedditOutputPath(ctx, cleanTokens);
+      const jsonTokens = [...cleanTokens, '--format', 'json', '--output', outputPath];
 
-            await replyMd(ctx, userMessage);
-            resolve();
-            return;
-          }
+      try {
+        await runRedditFetch(ctx, scriptPath, jsonTokens);
 
-          const output = (stdout || '').trim();
-          if (!output) {
-            const hint = (stderr || '').trim();
-            const errorInfo = hint ? `\n\n_${esc(hint.substring(0, 200))}_` : '';
-            await replyMd(ctx, `❌ No results returned\\.${errorInfo}`);
-            resolve();
-            return;
-          }
+        const sent = await messageSender.sendDocument(
+          ctx,
+          outputPath,
+          `📎 Reddit JSON saved: ${path.basename(outputPath)}`
+        );
 
-          await messageSender.sendMessage(ctx, output);
-          resolve();
-        } catch (sendError) {
-          console.error('[Reddit] Error sending result:', sendError);
-          try {
-            await replyMd(ctx, '❌ Failed to send Reddit results\\.');
-          } catch { /* swallow */ }
-          resolve();
-        }
+        const notice = sent
+          ? `Large thread detected \\(${output.length} chars\\) — sent JSON file for structured review\\.`
+          : `Large thread detected \\(${output.length} chars\\) — JSON saved at \`${esc(outputPath)}\`\\.`;
+
+        await replyMd(ctx, notice);
+      } catch (jsonError) {
+        console.error('[Reddit] JSON fallback failed:', jsonError);
+        await messageSender.sendMessage(ctx, output);
       }
-    );
-  });
+
+      return;
+    }
+
+    await messageSender.sendMessage(ctx, output);
+
+    if (hadOutputFlag) {
+      await replyMd(ctx, 'ℹ️ Note: `-o/--output` is ignored in chat mode\\. I can save JSON automatically for large threads\\.');
+    }
+  } catch (err: unknown) {
+    const error = err as { error?: Error; stderr?: string };
+    const stderrText = (error?.stderr || '').trim();
+    let userMessage: string;
+
+    if (stderrText.includes('Missing credentials') || stderrText.includes('REDDIT_CLIENT_ID')) {
+      userMessage = '❌ Reddit credentials not configured\\.\n\nSet `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `REDDIT_PASSWORD` in the redditfetch \\.env file\\.';
+    } else if (stderrText.includes('ModuleNotFoundError')) {
+      const modMatch = stderrText.match(/No module named '(\w+)'/);
+      const modName = modMatch ? modMatch[1] : 'unknown';
+      userMessage = `❌ Missing Python dependency: \`${esc(modName)}\`\n\nRun: \`pip install ${esc(modName)}\``;
+    } else if (error?.error && (error.error as { killed?: boolean }).killed) {
+      userMessage = '❌ Reddit fetch timed out\\.';
+    } else {
+      const detail = stderrText || (error?.error?.message || 'Unknown error');
+      userMessage = `❌ Reddit fetch failed: ${esc(detail.substring(0, 300))}`;
+    }
+
+    await replyMd(ctx, userMessage);
+  }
 }
 
 export async function handleReddit(ctx: Context): Promise<void> {

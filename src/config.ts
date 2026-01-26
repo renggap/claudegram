@@ -37,6 +37,10 @@ const envSchema = z.object({
     .default('4096')
     .transform((val) => parseInt(val, 10)),
   TTS_RESPONSE_FORMAT: z.string().default('opus'),
+  IMAGE_MAX_FILE_SIZE_MB: z
+    .string()
+    .default('20')
+    .transform((val) => parseInt(val, 10)),
   // New config options
   DANGEROUS_MODE: z
     .string()
@@ -45,6 +49,10 @@ const envSchema = z.object({
   MAX_LOOP_ITERATIONS: z
     .string()
     .default('5')
+    .transform((val) => parseInt(val, 10)),
+  REDDITFETCH_JSON_THRESHOLD_CHARS: z
+    .string()
+    .default('8000')
     .transform((val) => parseInt(val, 10)),
   // Reddit fetch configuration
   REDDITFETCH_PATH: z.string().default(''),

@@ -30,6 +30,7 @@ import {
 } from './handlers/command.handler.js';
 import { handleMessage } from './handlers/message.handler.js';
 import { handleVoice } from './handlers/voice.handler.js';
+import { handlePhoto, handleImageDocument } from './handlers/photo.handler.js';
 
 export async function createBot(): Promise<Bot> {
   const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
@@ -113,6 +114,10 @@ export async function createBot(): Promise<Bot> {
 
   // Handle voice messages
   bot.on('message:voice', handleVoice);
+
+  // Handle images
+  bot.on('message:photo', handlePhoto);
+  bot.on('message:document', handleImageDocument);
 
   // Handle regular text messages
   bot.on('message:text', handleMessage);
