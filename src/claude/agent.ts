@@ -102,7 +102,7 @@ export async function sendToAgent(
       allowedTools: ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Task'],
       permissionMode,
       abortController: controller,
-      pathToClaudeCodeExecutable: '/Users/nacho/.local/bin/claude',
+      pathToClaudeCodeExecutable: '/home/player3vsgpt/.claude/local/claude',
       stderr: (data: string) => {
         console.error('[Claude stderr]:', data);
       },
